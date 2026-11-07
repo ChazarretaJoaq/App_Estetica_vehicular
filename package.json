@@ -1,0 +1,13 @@
+{
+  "name": "app-estetica-vehicular",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Valhalla - App de estetica vehicular (PWA estatica)",
+  "scripts": {
+    "dev": "serve valhalla-app --listen 3000",
+    "start": "serve valhalla-app --listen 3000"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}
