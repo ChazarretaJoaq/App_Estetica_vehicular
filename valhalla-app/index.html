@@ -601,21 +601,37 @@ function sheetPresu(n) {
 }
 
 /* ---------------- COTIZAR ---------------- */
-const Q = { mode: 'cliente', patente: '', modelo: '', ingreso: '', sel: [] };
+const Q = { mode: 'cliente', patente: '', marca: '', modelo: '', ingreso: '', sel: [] };
+/* --- selector de marca y modelo en dos menús --- */
+const marcasList = () => [...new Set(DB.modelos.map(m => m.marca))].sort((a, b) => a.localeCompare(b));
+const modelosDe = marca => DB.modelos.filter(m => m.marca === marca).sort((a, b) => String(a.modelo).localeCompare(String(b.modelo)));
+const modeloOpts = (marca, sel) => '<option value="">' + (marca ? 'Elegí el modelo…' : 'Primero la marca') + '</option>' +
+  modelosDe(marca).map(m => `<option value="${esc(m.vehiculo)}" ${m.vehiculo === sel ? 'selected' : ''}>${esc(m.modelo)}</option>`).join('');
+function marcaModeloHTML(idMarca, idModelo, marca, vehSel) {
+  return `<div class="grid2"><div><label class="f">Marca</label><select class="inp" id="${idMarca}" data-modelo-target="${idModelo}"><option value="">Elegí la marca…</option>${marcasList().map(mk => `<option ${mk === marca ? 'selected' : ''}>${esc(mk)}</option>`).join('')}</select></div>
+    <div><label class="f">Modelo</label><select class="inp" id="${idModelo}" ${marca ? '' : 'disabled'}>${modeloOpts(marca, vehSel)}</select></div></div>`;
+}
+// Al cambiar la marca se recargan los modelos (si hay uno solo, queda elegido)
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.modeloTarget) return;
+  const mod = document.getElementById(t.dataset.modeloTarget); if (!mod) return;
+  const lista = modelosDe(t.value);
+  mod.innerHTML = modeloOpts(t.value, lista.length === 1 ? lista[0].vehiculo : '');
+  mod.disabled = !t.value;
+  mod.dispatchEvent(new Event('change', { bubbles: true }));
+});
 function qVehiculo() { if (Q.mode === 'cliente') { const v = veh(Q.patente); return v ? v.vehiculo : ''; } return Q.modelo; }
 function renderCotizar() {
   if (!Q.ingreso) Q.ingreso = nextWorkday();
   const vName = qVehiculo(); const f = factors(vName); const m = modelo(vName);
   const vehOpts = DB.vehiculos.map(v => { const c = cli(v.idCliente) || {}; return `<option value="${esc(v.patente)}" ${v.patente === Q.patente ? 'selected' : ''}>${esc(v.patente)} · ${esc(v.vehiculo)} · ${esc(c.nombre || '')}</option>`; }).join('');
-  const marcas = [...new Set(DB.modelos.map(m => m.marca))];
-  const modOpts = marcas.map(mk => `<optgroup label="${esc(mk)}">${DB.modelos.filter(m => m.marca === mk).map(m => `<option ${m.vehiculo === Q.modelo ? 'selected' : ''}>${esc(m.vehiculo)}</option>`).join('')}</optgroup>`).join('');
   $('#s-cotizar').innerHTML = `
     <h1>Cotizar</h1><p class="sub">Tiempo y precio estimado según el vehículo</p>
     <label class="f">¿Para quién?</label>
     <div class="seg"><button data-m="cliente" class="${Q.mode === 'cliente' ? 'on' : ''}">Cliente registrado</button><button data-m="rapida" class="${Q.mode === 'rapida' ? 'on' : ''}">Consulta rápida</button></div>
     ${Q.mode === 'cliente'
       ? `<label class="f">Vehículo</label><select class="inp" id="qPat"><option value="">Elegí una patente…</option>${vehOpts}</select>`
-      : `<label class="f">Marca y modelo</label><select class="inp" id="qMod"><option value="">Elegí un modelo…</option>${modOpts}</select>`}
+      : marcaModeloHTML('qMarca', 'qMod', Q.marca, Q.modelo)}
     ${vName ? `<p class="note">${esc(vName)} · segmento <b>${esc(m ? m.segmento : '—')}</b> · factor tiempo <b>×${String(f.ft).replace('.', ',')}</b> · precio <b>×${String(f.fp).replace('.', ',')}</b></p>` : ''}
     <label class="f">Fecha de ingreso</label><input class="inp" type="date" id="qIng" value="${Q.ingreso}">
     <h2>Servicios</h2>
@@ -623,7 +639,8 @@ function renderCotizar() {
   `;
   document.querySelectorAll('#s-cotizar .seg button').forEach(b => b.onclick = () => { Q.mode = b.dataset.m; renderCotizar(); });
   const qp = $('#qPat'); if (qp) qp.onchange = () => { Q.patente = qp.value; renderCotizar(); };
-  const qm = $('#qMod'); if (qm) qm.onchange = () => { Q.modelo = qm.value; renderCotizar(); };
+  const qmk = $('#qMarca'); if (qmk) qmk.addEventListener('change', () => { Q.marca = qmk.value; });
+  const qm = $('#qMod'); if (qm) qm.onchange = () => { if (qm.value !== Q.modelo) { Q.modelo = qm.value; renderCotizar(); } };
   $('#qIng').onchange = e => { Q.ingreso = e.target.value; renderSummary(); };
   document.querySelectorAll('#s-cotizar .svc').forEach(el => el.onclick = () => {
     const n = el.dataset.s; Q.sel = Q.sel.includes(n) ? Q.sel.filter(x => x !== n) : [...Q.sel, n];
@@ -739,13 +756,9 @@ function sheetCliente(id) {
     ${s.trab.length ? s.trab.slice().sort((a, b) => b.fin.localeCompare(a.fin)).map(trabajoCard).join('') : '<div class="empty">Todavía no hay trabajos</div>'}
   `, el => { el.querySelector('#addV').onclick = () => sheetNuevoVehiculo(id); });
 }
-function modeloSelect(idAttr) {
-  const marcas = [...new Set(DB.modelos.map(m => m.marca))];
-  return `<select class="inp" id="${idAttr}"><option value="">Elegí marca y modelo…</option>${marcas.map(mk => `<optgroup label="${esc(mk)}">${DB.modelos.filter(m => m.marca === mk).map(m => `<option>${esc(m.vehiculo)}</option>`).join('')}</optgroup>`).join('')}</select>`;
-}
 function vehFields() {
   return `<label class="f">Patente</label><input class="inp" id="vPat" placeholder="AA123BB" style="text-transform:uppercase">
-    <label class="f">Marca y modelo</label>${modeloSelect('vMod')}
+    ${marcaModeloHTML('vMarca', 'vMod', '', '')}
     <div class="grid2"><div><label class="f">Año</label><input class="inp" id="vAnio" type="number" inputmode="numeric" placeholder="2022"></div><div><label class="f">Color</label><input class="inp" id="vCol" placeholder="Blanco"></div></div>`;
 }
 function readVeh(idCliente) {
