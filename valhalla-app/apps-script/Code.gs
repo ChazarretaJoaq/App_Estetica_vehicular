@@ -27,10 +27,13 @@ const SCHEMA = {
   Trabajos:       ['id', 'n', 'inicio', 'fin', 'patente', '_idCliente', '_cliente', '_vehiculo', 'servicio', '_de', '_dr', '_dv', 'precio', 'medio', 'notas'],
   Productos:      ['codigo', 'nombre', 'categoria', 'unidad', 'inicial', 'minimo', 'costo', 'proveedor', '_entradas', '_salidas', '_stock', '_estado', '_valor'],
   Movimientos:    ['fecha', 'codigo', '_producto', 'tipo', 'cantidad', 'motivo', 'usuario'],
-  Contactos:      ['id', 'nombre', 'tipo', 'telefono', 'email', 'empresa', 'notas']
+  Contactos:      ['id', 'nombre', 'tipo', 'telefono', 'email', 'empresa', 'notas'],
+  Solicitudes:    ['id', 'fecha', 'nombre', 'telefono', 'vehiculo', 'patente', 'servicios', 'deseada', 'dias', 'precio', 'notas', 'estado', 'n']
 };
+// Acciones del link público de reservas: no piden usuario ni PIN
+const PUBLIC_ACTIONS = ['catalogo', 'solicitar'];
 const ADMIN_SHEETS = ['Productos', 'Movimientos', 'Contactos'];
-// Presupuestos que carga un operador quedan en este estado hasta que el admin los apruebe
+// Las solicitudes que llegan del link de reservas quedan en este estado hasta que el negocio las confirme
 const ESPERA = 'En espera de aprobación';
 
 /* ---------------- entrada ---------------- */
@@ -43,6 +46,11 @@ function doPost(e) {
   try {
     lock.waitLock(15000);
     const body = JSON.parse(e.postData.contents);
+    if (PUBLIC_ACTIONS.indexOf(body.action) >= 0) {
+      const res = body.action === 'catalogo' ? { data: catalogo() } : { result: solicitar(body.payload || {}) };
+      SpreadsheetApp.flush();
+      return json(Object.assign({ ok: true }, res));
+    }
     const user = auth(body.usuario, body.pin);
     let result = {};
     if (body.action !== 'all' && body.action !== 'login') {
@@ -72,21 +80,19 @@ const ACTIONS = {
     insertRow('Vehiculos', { patente: p.patente, idCliente: p.idCliente, vehiculo: p.vehiculo, anio: p.anio, color: p.color });
     return { patente: p.patente };
   },
-  addPresupuesto: function (p, user) {
+  addPresupuesto: function (p) {
     const n = nextId('Presupuestos', 'n', 'P', 4);
-    const estado = user.rol === 'admin' ? 'Pendiente' : ESPERA;
+    const estado = p.estado || 'Pendiente';
     (p.servicios || []).forEach(function (s) {
       insertRow('Presupuestos', { n: n, fecha: new Date(), patente: p.patente, servicio: s, estado: estado });
     });
     return { n: n, estado: estado };
   },
-  setPresupuestoEstado: function (p, user) {
-    if (user.rol !== 'admin' && getField('Presupuestos', 'n', p.n, 'estado') === ESPERA) throw new Error('Solo el negocio (admin) puede aprobar este presupuesto');
+  setPresupuestoEstado: function (p) {
     setField('Presupuestos', 'n', p.n, 'estado', p.estado);
     return {};
   },
-  addTurno: function (p, user) {
-    if (user.rol !== 'admin' && getField('Presupuestos', 'n', p.n, 'estado') === ESPERA) throw new Error('El presupuesto todavía espera la aprobación del negocio');
+  addTurno: function (p) {
     const id = nextId('Turnos', 'id', 'T', 3);
     insertRow('Turnos', { id: id, n: p.n, ingreso: toDate(p.ingreso), estado: p.estado || 'Agendado', notas: p.notas || '' });
     setField('Presupuestos', 'n', p.n, 'estado', 'Aprobado');
@@ -134,6 +140,34 @@ const ACTIONS = {
     });
     return { importados: n };
   },
+  confirmarSolicitud: function (p) {
+    const rows = findRows('Solicitudes', 'id', p.id);
+    if (!rows.length) throw new Error('Solicitud no encontrada');
+    const sh = SpreadsheetApp.getActive().getSheetByName('Solicitudes');
+    const v = sh.getRange(rows[0], 1, 1, SCHEMA.Solicitudes.length).getValues()[0];
+    const s = {}; SCHEMA.Solicitudes.forEach(function (k, i) { s[k] = v[i]; });
+    if (s.estado !== ESPERA) throw new Error('La solicitud ya fue ' + String(s.estado).toLowerCase());
+    // cliente: se busca por teléfono (últimos 8 dígitos); si no existe, se crea
+    const tel = String(s.telefono).replace(/\D/g, '').slice(-8);
+    const cs = SpreadsheetApp.getActive().getSheetByName('Clientes');
+    const nc = Math.max(0, cs.getLastRow() - FIRST_ROW + 1);
+    let idCliente = '';
+    if (nc) cs.getRange(FIRST_ROW, 1, nc, 3).getValues().forEach(function (r) {
+      if (!idCliente && r[0] && tel && String(r[2]).replace(/\D/g, '').slice(-8) === tel) idCliente = r[0];
+    });
+    if (!idCliente) idCliente = ACTIONS.addCliente({ nombre: s.nombre, telefono: s.telefono, email: '', direccion: '', notas: 'Llegó por el link de reservas' }).id;
+    if (!findRows('Vehiculos', 'patente', s.patente).length) insertRow('Vehiculos', { patente: s.patente, idCliente: idCliente, vehiculo: s.vehiculo, anio: '', color: '' });
+    const servicios = String(s.servicios).split(';').map(function (x) { return x.trim(); }).filter(String);
+    const n = ACTIONS.addPresupuesto({ patente: s.patente, servicios: servicios, estado: 'Aprobado' }).n;
+    ACTIONS.addTurno({ n: n, ingreso: p.ingreso || s.deseada, notas: 'Reserva online ' + s.id });
+    setField('Solicitudes', 'id', p.id, 'estado', 'Confirmada');
+    setField('Solicitudes', 'id', p.id, 'n', n);
+    return { n: n, idCliente: idCliente };
+  },
+  rechazarSolicitud: function (p) {
+    setField('Solicitudes', 'id', p.id, 'estado', 'Rechazada');
+    return {};
+  },
   addTrabajos: function (p) {
     (p.items || []).forEach(function (it) {
       const id = nextId('Trabajos', 'id', 'W', 3);
@@ -178,9 +212,11 @@ function readAll(rol) {
     productos: out.Productos,
     movimientos: out.Movimientos,
     contactos: out.Contactos,
+    solicitudes: out.Solicitudes,
     params: {
       pattern: par.getRange('B13').getDisplayValue(),
       capacidad: par.getRange('B14').getValue(),
+      telefonoNegocio: par.getRange('B15').getDisplayValue(),
       feriados: list('K5:K44').map(function (d) { return d instanceof Date ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : String(d); }),
       estadosTurno: list('G5:G14'),
       medios: list('H5:H14'),
@@ -238,6 +274,48 @@ function setField(name, key, value, field, newValue) {
   const rows = findRows(name, key, value);
   if (!rows.length) throw new Error('No se encontró ' + value + ' en ' + name);
   rows.forEach(function (r) { sh.getRange(r, col).setValue(newValue); });
+}
+
+/* ---------------- link público de reservas ---------------- */
+// Solo lo necesario para cotizar: servicios, modelos, calendario y ocupación por día (sin datos de clientes)
+function catalogo() {
+  const d = readAll('operador');
+  const ocup = {};
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  d.turnos.forEach(function (t) {
+    if (t.estado === 'Cancelado' || t.estado === 'Entregado' || !t.ingreso || !t.entrega) return;
+    const a = new Date(t.ingreso + 'T12:00:00'), b = new Date(t.entrega + 'T12:00:00');
+    for (let x = a; x <= b; x.setDate(x.getDate() + 1)) {
+      const k = Utilities.formatDate(x, tz, 'yyyy-MM-dd'); ocup[k] = (ocup[k] || 0) + 1;
+    }
+  });
+  return { servicios: d.servicios, modelos: d.modelos, params: d.params, ocupacion: ocup };
+}
+
+function solicitar(p) {
+  if (p.website) throw new Error('No se pudo enviar');
+  const d = readAll('operador');
+  const m = d.modelos.filter(function (x) { return x.vehiculo === p.vehiculo; })[0];
+  if (!m) throw new Error('Elegí la marca y el modelo');
+  const patente = String(p.patente || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z0-9]{6,7}$/.test(patente)) throw new Error('Revisá la patente');
+  const servicios = (p.servicios || []).slice(0, 12);
+  if (!servicios.length) throw new Error('Elegí al menos un servicio');
+  let dias = 0, precio = 0;
+  servicios.forEach(function (n) {
+    const sv = d.servicios.filter(function (x) { return x.nombre === n; })[0];
+    if (!sv) throw new Error('Servicio no disponible: ' + n);
+    dias += Math.ceil(Number(sv.dias) * Number(m.ft || 1) * 2) / 2;
+    precio += Number(sv.precio) * Number(m.fp || 1);
+  });
+  const nombre = String(p.nombre || '').trim().slice(0, 80), telefono = String(p.telefono || '').trim().slice(0, 30);
+  if (nombre.length < 2) throw new Error('Falta tu nombre');
+  if (telefono.replace(/\D/g, '').length < 8) throw new Error('Revisá tu WhatsApp');
+  if (!p.deseada) throw new Error('Elegí un día');
+  const id = nextId('Solicitudes', 'id', 'R', 4);
+  insertRow('Solicitudes', { id: id, fecha: new Date(), nombre: nombre, telefono: telefono, vehiculo: p.vehiculo, patente: patente,
+    servicios: servicios.join('; '), deseada: toDate(p.deseada), dias: dias, precio: Math.round(precio), notas: String(p.notas || '').slice(0, 300), estado: ESPERA, n: '' });
+  return { id: id, dias: dias, precio: Math.round(precio) };
 }
 
 function getField(name, key, value, field) {

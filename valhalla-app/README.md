@@ -66,6 +66,22 @@ Abrí la URL en el celular → menú del navegador → **Agregar a pantalla de i
 
 Es la misma lógica que las fórmulas del Sheet, así que la app y la planilla siempre coinciden.
 
+## Link de reservas para clientes
+
+Los clientes cotizan y piden turno solos desde **`/reservar`** (por ejemplo `https://valhalla-bay.vercel.app/reservar`), sin usuario ni PIN:
+
+1. Eligen marca, modelo y patente.
+2. Marcan los servicios (con el botón **i** ven qué incluye cada uno) y ven tiempo y precio orientativo.
+3. Eligen un día: solo se ofrecen los días con lugar en el taller.
+4. Dejan nombre y WhatsApp y envían.
+
+La solicitud llega a la app como **En espera de aprobación** (sección *Solicitudes de clientes* en Inicio y hoja `Solicitudes`). El negocio la abre, puede mover la fecha y:
+
+- **Confirma**: se crean solos el cliente (si es nuevo), el vehículo, el presupuesto *Aprobado* y el turno, y aparece el botón para avisarle por WhatsApp.
+- **Rechaza**: queda *Rechazada* y se ofrece un WhatsApp para proponerle otra fecha.
+
+El link para compartir está en ⚙️ Ajustes (Copiar / Compartir por WhatsApp). Para que funcione **en vivo**, `CONFIG.API_URL` tiene que estar completo en `index.html` (los clientes no pasan por Ajustes). El link público solo recibe servicios, modelos y la ocupación por día: nunca datos de otros clientes. En `Parametros!B15` se puede cargar el WhatsApp del negocio para que el cliente pueda escribir.
+
 ## WhatsApp
 
 - **Botones de WhatsApp (incluidos, gratis):** cotización, "tu auto está listo", contactar clientes/proveedores y **pedido de reposición al proveedor** con la lista de productos bajos. Abren WhatsApp con el mensaje escrito; se envía a mano.
