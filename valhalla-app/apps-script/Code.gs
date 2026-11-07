@@ -30,6 +30,8 @@ const SCHEMA = {
   Contactos:      ['id', 'nombre', 'tipo', 'telefono', 'email', 'empresa', 'notas']
 };
 const ADMIN_SHEETS = ['Productos', 'Movimientos', 'Contactos'];
+// Presupuestos que carga un operador quedan en este estado hasta que el admin los apruebe
+const ESPERA = 'En espera de aprobación';
 
 /* ---------------- entrada ---------------- */
 function doGet() {
@@ -70,18 +72,21 @@ const ACTIONS = {
     insertRow('Vehiculos', { patente: p.patente, idCliente: p.idCliente, vehiculo: p.vehiculo, anio: p.anio, color: p.color });
     return { patente: p.patente };
   },
-  addPresupuesto: function (p) {
+  addPresupuesto: function (p, user) {
     const n = nextId('Presupuestos', 'n', 'P', 4);
+    const estado = user.rol === 'admin' ? 'Pendiente' : ESPERA;
     (p.servicios || []).forEach(function (s) {
-      insertRow('Presupuestos', { n: n, fecha: new Date(), patente: p.patente, servicio: s, estado: p.estado || 'Pendiente' });
+      insertRow('Presupuestos', { n: n, fecha: new Date(), patente: p.patente, servicio: s, estado: estado });
     });
-    return { n: n };
+    return { n: n, estado: estado };
   },
-  setPresupuestoEstado: function (p) {
+  setPresupuestoEstado: function (p, user) {
+    if (user.rol !== 'admin' && getField('Presupuestos', 'n', p.n, 'estado') === ESPERA) throw new Error('Solo el negocio (admin) puede aprobar este presupuesto');
     setField('Presupuestos', 'n', p.n, 'estado', p.estado);
     return {};
   },
-  addTurno: function (p) {
+  addTurno: function (p, user) {
+    if (user.rol !== 'admin' && getField('Presupuestos', 'n', p.n, 'estado') === ESPERA) throw new Error('El presupuesto todavía espera la aprobación del negocio');
     const id = nextId('Turnos', 'id', 'T', 3);
     insertRow('Turnos', { id: id, n: p.n, ingreso: toDate(p.ingreso), estado: p.estado || 'Agendado', notas: p.notas || '' });
     setField('Presupuestos', 'n', p.n, 'estado', 'Aprobado');
@@ -233,6 +238,13 @@ function setField(name, key, value, field, newValue) {
   const rows = findRows(name, key, value);
   if (!rows.length) throw new Error('No se encontró ' + value + ' en ' + name);
   rows.forEach(function (r) { sh.getRange(r, col).setValue(newValue); });
+}
+
+function getField(name, key, value, field) {
+  const rows = findRows(name, key, value);
+  if (!rows.length) return '';
+  const col = SCHEMA[name].indexOf(field) + 1;
+  return SpreadsheetApp.getActive().getSheetByName(name).getRange(rows[0], col).getValue();
 }
 
 function nextId(name, key, prefix, len) {

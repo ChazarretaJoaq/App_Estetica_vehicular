@@ -94,6 +94,13 @@ input[type=date].inp{color-scheme:dark}
 .svc.on .ck{background:var(--gold);border-color:var(--gold)}
 .svc.on .ck::after{content:"";width:6px;height:11px;border:solid #141108;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
 .svc .d{text-align:right;font-size:13px}
+.svc{flex-wrap:wrap}
+.svc .info{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--gold2);font:600 12px/20px Georgia,serif;font-style:italic;text-align:center;cursor:pointer;flex:none;margin-left:6px;vertical-align:middle;padding:0}
+.svc.open .info{background:var(--gold);color:#141108;border-color:var(--gold)}
+.svc .tip{display:none;flex-basis:100%;margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.25);font-size:13px;line-height:1.45;color:var(--text)}
+.svc.open .tip{display:block;animation:fade .2s ease}
+.svc .tip b{color:var(--gold2)}
+.presu-desc{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;font-weight:400}
 .svc .d b{display:block;color:var(--gold2);font-size:15px}
 .summary{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tab) + var(--sb) + 8px);width:min(444px,calc(100% - 16px));background:rgba(28,26,20,.96);backdrop-filter:blur(12px);border:1px solid rgba(212,175,55,.4);border-radius:22px;padding:12px 14px;z-index:25;box-shadow:0 10px 40px rgba(0,0,0,.5);display:none}
 .summary.on{display:block}
@@ -264,6 +271,20 @@ const store = {
 };
 
 /* ---------------- datos demo ---------------- */
+const DEMO_DESC = {
+  S01: 'Devolvemos la transparencia a los faros opacos o amarillentos y los sellamos con protección UV. Más luz de noche y un frente renovado.',
+  S02: 'Corrección de pintura en una etapa que elimina micro rayas y opacidad, con encerado final. El auto recupera brillo y profundidad de color.',
+  S03: 'Corte y abrillantado para remolinos y rayas finas marcadas. El máximo nivel de brillo, ideal antes de vender o de un tratamiento cerámico.',
+  S04: 'Descontaminación, preparación y coating cerámico. Protege la pintura del sol y la suciedad, repele el agua y hace cada lavado más fácil.',
+  S05: 'Capa de cera o sellador sintético que realza el brillo y suma protección a la pintura.',
+  S06: 'Clay bar y removedor férrico para sacar partículas incrustadas. La pintura queda lisa al tacto y lista para pulir o proteger.',
+  S07: 'Lavado a mano con productos de pH neutro, llantas, pasaruedas y vidrios, cuidando la pintura en cada paso.',
+  S08: 'Aspirado profundo, plásticos, alfombras y tapizados. El interior vuelve a sentirse como nuevo.',
+  S09: 'Limpieza e hidratación del cuero para recuperar su suavidad y prevenir grietas.',
+  S10: 'Desengrase cuidadoso y acondicionado de los plásticos del motor. Ideal antes de una venta o una revisión.',
+  S11: 'Pulido y protección de llantas para recuperar el brillo y que la suciedad se adhiera menos.',
+  S12: 'Renueva paragolpes, molduras y gomas descoloridas por el sol, con un acabado negro profundo.'
+};
 function demoData() {
   const D = n => plusDays(today(), n);
   const SEG = { 'Chico': [0.8, 0.85], 'Mediano': [1, 1], 'SUV': [1.25, 1.2], 'Pick-up': [1.4, 1.3], 'Grande': [1.5, 1.4] };
@@ -279,7 +300,7 @@ function demoData() {
       ['S04','Tratamiento cerámico','Protección',2,380000],['S05','Encerado / sellador','Protección',0.5,60000],['S06','Descontaminación de pintura','Limpieza',1,70000],
       ['S07','Lavado detallado exterior','Limpieza',0.5,35000],['S08','Limpieza detallada interior','Interior',1,90000],['S09','Tratamiento de cueros','Interior',1,80000],
       ['S10','Limpieza de motor','Limpieza',0.5,40000],['S11','Pulido de llantas','Restauración',1,60000],['S12','Restauración de plásticos exteriores','Restauración',0.5,45000]
-    ].map(([id, nombre, categoria, dias, precio]) => ({ id, nombre, categoria, dias, precio })),
+    ].map(([id, nombre, categoria, dias, precio]) => ({ id, nombre, categoria, dias, precio, desc: DEMO_DESC[id] })),
     modelos: mods.map(([marca, modelo, seg, aj]) => ({ marca, modelo, vehiculo: marca + ' ' + modelo, segmento: seg, ft: aj || SEG[seg][0], fp: SEG[seg][1] })),
     clientes: [
       { id: 'C001', nombre: 'Martín Gómez', telefono: '11 5555-1234', email: 'martin.gomez@mail.com', direccion: 'San Fernando', alta: D(-64), notas: 'Prefiere WhatsApp' },
@@ -415,9 +436,9 @@ const nextId = (arr, key, pre, len) => pre + String(arr.reduce((m, o) => Math.ma
 const local = {
   addCliente(p) { const id = nextId(DB.clientes, 'id', 'C', 3); DB.clientes.push(Object.assign({ id, alta: today() }, p)); return { id }; },
   addVehiculo(p) { DB.vehiculos.push(p); return { patente: p.patente }; },
-  addPresupuesto(p) { const n = nextId(DB.presupuestos, 'n', 'P', 4); p.servicios.forEach(s => DB.presupuestos.push({ n, fecha: today(), patente: p.patente, servicio: s, estado: p.estado || 'Pendiente' })); return { n }; },
-  setPresupuestoEstado(p) { DB.presupuestos.filter(x => x.n === p.n).forEach(x => x.estado = p.estado); return {}; },
-  addTurno(p) { const id = nextId(DB.turnos, 'id', 'T', 3); DB.turnos.push({ id, n: p.n, ingreso: p.ingreso, estado: p.estado || 'Agendado', notas: p.notas || '' }); local.setPresupuestoEstado({ n: p.n, estado: 'Aprobado' }); return { id }; },
+  addPresupuesto(p) { const n = nextId(DB.presupuestos, 'n', 'P', 4); const estado = isAdmin() ? 'Pendiente' : ESPERA; p.servicios.forEach(s => DB.presupuestos.push({ n, fecha: today(), patente: p.patente, servicio: s, estado })); return { n, estado }; },
+  setPresupuestoEstado(p) { const lines = DB.presupuestos.filter(x => x.n === p.n); if (lines.some(x => x.estado === ESPERA) && !isAdmin()) throw new Error('Solo el negocio (admin) puede aprobar este presupuesto'); lines.forEach(x => x.estado = p.estado); return {}; },
+  addTurno(p) { if (DB.presupuestos.some(x => x.n === p.n && x.estado === ESPERA) && !isAdmin()) throw new Error('El presupuesto todavía espera la aprobación del negocio'); const id = nextId(DB.turnos, 'id', 'T', 3); DB.turnos.push({ id, n: p.n, ingreso: p.ingreso, estado: p.estado || 'Agendado', notas: p.notas || '' }); local.setPresupuestoEstado({ n: p.n, estado: 'Aprobado' }); return { id }; },
   setTurnoEstado(p) { const t = DB.turnos.find(x => x.id === p.id); if (t) t.estado = p.estado; return {}; },
   addTrabajos(p) { p.items.forEach(it => { const id = nextId(DB.trabajos, 'id', 'W', 3); DB.trabajos.push(Object.assign({ id }, it)); }); return {}; },
   addProducto(p) { const codigo = nextId(DB.productos, 'codigo', 'PR', 2); DB.productos.push(Object.assign({ codigo }, p)); return { codigo }; },
@@ -456,7 +477,16 @@ function turnoInfo(t) {
 }
 const activos = () => DB.turnos.filter(t => t.estado !== 'Cancelado' && t.estado !== 'Entregado').map(turnoInfo);
 const carsOn = d => activos().filter(t => t.ingreso <= d && t.entrega >= d);
-const estadoChip = e => ({ 'Agendado': 'a', 'En proceso': 'b', 'Terminado': 'g', 'Entregado': '', 'Cancelado': 'r', 'Aprobado': 'g', 'Pendiente': 'a', 'Rechazado': 'r' }[e] ?? '');
+const ESPERA = 'En espera de aprobación';
+const estadoChip = e => ({ 'Agendado': 'a', 'En proceso': 'b', 'Terminado': 'g', 'Entregado': '', 'Cancelado': 'r', 'Aprobado': 'g', 'Pendiente': 'a', 'Rechazado': 'r', [ESPERA]: 'b' }[e] ?? '');
+const estadoLabel = e => e === 'Pendiente' ? 'Pendiente del cliente' : e;
+// Mensaje de cotización para WhatsApp, con el resumen de cada servicio para que el cliente se entusiasme
+function msgCotizacion(nombre, vehiculo, servicios, habiles, ingreso, entrega, precio) {
+  const det = servicios.map(s => { const d = (svc(s) || {}).desc; return '• ' + s + (d ? ': ' + d : ''); }).join('\n');
+  return `Hola${nombre ? ' ' + nombre.split(' ')[0] : ''}! Te paso la cotización para tu ${vehiculo || 'vehículo'}:\n\n${det}\n\n` +
+    `Tiempo estimado: ${habiles} ${habiles === 1 ? 'día' : 'días'}` + (ingreso ? `. Si lo traés el ${fmtD(ingreso)}, te lo entregamos el ${fmtD(entrega)}` : '') +
+    `.\nPrecio estimado: ${money(precio)}.\n— Valhalla`;
+}
 function waLink(phone, text) {
   let d = String(phone || '').replace(/\D/g, '');
   if (d && !d.startsWith('54')) d = '549' + d.replace(/^0/, '');
@@ -498,6 +528,7 @@ function renderHome() {
   const facMes = DB.trabajos.filter(t => t.fin >= mesIni && t.fin <= hoy).reduce((a, t) => a + Number(t.precio || 0), 0);
   const proximos = activos().filter(t => t.ingreso > hoy).sort((a, b) => a.ingreso.localeCompare(b.ingreso)).slice(0, 4);
   const pend = [...new Set(DB.presupuestos.filter(p => p.estado === 'Pendiente').map(p => p.n))].map(presu);
+  const espera = [...new Set(DB.presupuestos.filter(p => p.estado === ESPERA).map(p => p.n))].map(presu);
   const fecha = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   $('#s-home').innerHTML = `
     <p class="sub">${cap1(fecha)}</p>
@@ -516,7 +547,9 @@ function renderHome() {
     ${enTaller.length ? enTaller.map(turnoCard).join('') : '<div class="empty">No hay autos en el taller hoy</div>'}
     <h2>Próximos ingresos <a onclick="go('agenda')">Ver agenda</a></h2>
     ${proximos.length ? proximos.map(turnoCard).join('') : '<div class="empty">Sin turnos agendados</div>'}
-    <h2>Presupuestos pendientes</h2>
+    ${espera.length || !isAdmin() ? `<h2>${isAdmin() ? 'Esperan tu aprobación' : 'En espera de aprobación del negocio'}</h2>
+    ${espera.length ? espera.map(presuCard).join('') : '<div class="empty">Nada esperando aprobación</div>'}` : ''}
+    <h2>Pendientes de respuesta del cliente</h2>
     ${pend.length ? pend.map(presuCard).join('') : '<div class="empty">No hay presupuestos pendientes</div>'}
   `;
 }
@@ -536,7 +569,7 @@ function presuCard(p) {
   return `<div class="card tap" onclick="sheetPresu('${p.n}')"><div class="row">
     <div class="avatar" style="font-size:12px">${esc(p.n.replace('P', '#'))}</div>
     <div class="grow"><div class="t1">${esc(p.veh.vehiculo || '—')} <span class="plate">${esc(p.patente)}</span></div><div class="t2">${esc(p.cli.nombre || '')} · ${days(p.dias)} · ${money(p.precio)}</div></div>
-    <span class="chip ${estadoChip(p.estado)}">${esc(p.estado)}</span></div></div>`;
+    <span class="chip ${estadoChip(p.estado)}">${esc(p.estado === ESPERA ? 'Por aprobar' : p.estado)}</span></div></div>`;
 }
 function sheetTurno(id) {
   const t = turnoInfo(DB.turnos.find(x => x.id === id));
@@ -584,19 +617,32 @@ function sheetRegistrarEntrega(t) {
 }
 function sheetPresu(n) {
   const p = presu(n);
+  const enEspera = p.estado === ESPERA;
+  const cerrado = p.estado === 'Rechazado' || p.estado === 'Vencido' || DB.turnos.some(t => t.n === n && t.estado !== 'Cancelado');
+  const ing = nextWorkday();
+  const waMsg = () => { const d = $('#pIng') ? $('#pIng').value : ing; return msgCotizacion(p.cli.nombre, p.veh.vehiculo, p.servicios, Math.ceil(p.dias), d, workday(d, Math.max(0, Math.ceil(p.dias) - 1)), p.precio); };
+  let acciones;
+  if (cerrado) acciones = '';
+  else if (enEspera && isAdmin()) acciones = `<p class="note">Lo cargó un operador. Revisá servicios y precio: al aprobarlo pasa a <b>Pendiente del cliente</b> y ya se le puede enviar.</p>
+    <div class="btnrow"><button class="btn ghost" id="pRej">Rechazar</button><button class="btn gold" id="pApr">Aprobar presupuesto</button></div>`;
+  else if (enEspera) acciones = `<p class="note">⏳ Este presupuesto espera la aprobación del negocio. Cuando el admin lo apruebe, se puede enviar al cliente y agendar.</p>`;
+  else acciones = `<label class="f">Fecha de ingreso para agendar</label><input class="inp" type="date" id="pIng" value="${ing}">
+    <p class="note" id="pPrev"></p>
+    <div class="btnrow"><a class="btn green" id="pWa" href="#" target="_blank" rel="noopener">Enviar al cliente por WhatsApp</a></div>
+    <div class="btnrow"><button class="btn ghost" id="pRej">Rechazó</button><button class="btn gold" id="pOk">Aceptó: agendar</button></div>`;
   openSheet(`
     <h3>Presupuesto ${esc(n)}</h3><p class="sub">${esc(p.cli.nombre || '')} · ${esc(p.veh.vehiculo || '')} · <span class="plate">${esc(p.patente)}</span></p>
-    ${p.servicios.map(s => `<div class="kv"><span>${esc(s)}</span><b>${days(estDias(s, p.f.ft))} · ${money(estPrecio(s, p.f.fp))}</b></div>`).join('')}
+    ${p.servicios.map(s => `<div class="kv"><span>${esc(s)}${(svc(s) || {}).desc ? `<span class="presu-desc">${esc(svc(s).desc)}</span>` : ''}</span><b style="white-space:nowrap;padding-left:10px">${days(estDias(s, p.f.ft))} · ${money(estPrecio(s, p.f.fp))}</b></div>`).join('')}
     <div class="kv"><span>Total</span><b style="color:var(--gold2)">${days(p.dias)} · ${money(p.precio)}</b></div>
-    <div class="kv"><span>Estado</span><span class="chip ${estadoChip(p.estado)}">${esc(p.estado)}</span></div>
-    <label class="f">Fecha de ingreso para agendar</label><input class="inp" type="date" id="pIng" value="${nextWorkday()}">
-    <p class="note" id="pPrev"></p>
-    <div class="btnrow"><button class="btn ghost" id="pRej">Rechazar</button><button class="btn gold" id="pOk">Aprobar y agendar</button></div>
+    <div class="kv"><span>Estado</span><span class="chip ${estadoChip(p.estado)}">${esc(estadoLabel(p.estado))}</span></div>
+    ${acciones}
   `, el => {
-    const prev = () => { const d = $('#pIng').value; if (d) $('#pPrev').innerHTML = `Entrega estimada: <b>${fmtDL(workday(d, Math.max(0, Math.ceil(p.dias) - 1)))}</b> · ocupación ese día: ${carsOn(d).length}/${DB.params.capacidad}`; };
-    $('#pIng').oninput = prev; prev();
-    el.querySelector('#pRej').onclick = async e => { await run(e.currentTarget, () => api('setPresupuestoEstado', { n, estado: 'Rechazado' })); closeSheet(); toast('Presupuesto rechazado'); render(); };
-    el.querySelector('#pOk').onclick = async e => { await run(e.currentTarget, () => api('addTurno', { n, ingreso: $('#pIng').value })); closeSheet(); toast('Turno agendado ✓'); render(); };
+    const pIng = el.querySelector('#pIng');
+    const prev = () => { const d = pIng.value; if (d) $('#pPrev').innerHTML = `Entrega estimada: <b>${fmtDL(workday(d, Math.max(0, Math.ceil(p.dias) - 1)))}</b> · ocupación ese día: ${carsOn(d).length}/${DB.params.capacidad}`; const wa = $('#pWa'); if (wa) wa.href = waLink(p.cli.telefono, waMsg()); };
+    if (pIng) { pIng.oninput = prev; prev(); }
+    const rej = el.querySelector('#pRej'); if (rej) rej.onclick = async e => { await run(e.currentTarget, () => api('setPresupuestoEstado', { n, estado: 'Rechazado' })); closeSheet(); toast('Presupuesto rechazado'); render(); };
+    const apr = el.querySelector('#pApr'); if (apr) apr.onclick = async e => { await run(e.currentTarget, () => api('setPresupuestoEstado', { n, estado: 'Pendiente' })); toast('Presupuesto aprobado ✓ ya se puede enviar'); render(); sheetPresu(n); };
+    const ok = el.querySelector('#pOk'); if (ok) ok.onclick = async e => { await run(e.currentTarget, () => api('addTurno', { n, ingreso: pIng.value })); closeSheet(); toast('Turno agendado ✓'); render(); };
   });
 }
 
@@ -635,13 +681,15 @@ function renderCotizar() {
     ${vName ? `<p class="note">${esc(vName)} · segmento <b>${esc(m ? m.segmento : '—')}</b> · factor tiempo <b>×${String(f.ft).replace('.', ',')}</b> · precio <b>×${String(f.fp).replace('.', ',')}</b></p>` : ''}
     <label class="f">Fecha de ingreso</label><input class="inp" type="date" id="qIng" value="${Q.ingreso}">
     <h2>Servicios</h2>
-    ${DB.servicios.map(s => { const on = Q.sel.includes(s.nombre); return `<div class="svc ${on ? 'on' : ''}" data-s="${esc(s.nombre)}"><span class="ck"></span><div class="grow"><div class="t1">${esc(s.nombre)}</div><div class="t2">${esc(s.categoria || '')} · base ${days(Number(s.dias))}</div></div><div class="d"><b>${vName ? days(estDias(s.nombre, f.ft)) : '—'}</b>${vName ? money(estPrecio(s.nombre, f.fp)) : ''}</div></div>`; }).join('')}
+    ${DB.servicios.map(s => { const on = Q.sel.includes(s.nombre); return `<div class="svc ${on ? 'on' : ''}" data-s="${esc(s.nombre)}"><span class="ck"></span><div class="grow"><div class="t1" style="white-space:normal">${esc(s.nombre)}${s.desc ? `<button class="info" type="button" aria-label="Ver detalle de ${esc(s.nombre)}" title="${esc(s.desc)}">i</button>` : ''}</div><div class="t2">${esc(s.categoria || '')} · base ${days(Number(s.dias))}</div></div><div class="d"><b>${vName ? days(estDias(s.nombre, f.ft)) : '—'}</b>${vName ? money(estPrecio(s.nombre, f.fp)) : ''}</div>${s.desc ? `<div class="tip"><b>${esc(s.nombre)}.</b> ${esc(s.desc)}</div>` : ''}</div>`; }).join('')}
   `;
   document.querySelectorAll('#s-cotizar .seg button').forEach(b => b.onclick = () => { Q.mode = b.dataset.m; renderCotizar(); });
   const qp = $('#qPat'); if (qp) qp.onchange = () => { Q.patente = qp.value; renderCotizar(); };
   const qmk = $('#qMarca'); if (qmk) qmk.addEventListener('change', () => { Q.marca = qmk.value; });
   const qm = $('#qMod'); if (qm) qm.onchange = () => { if (qm.value !== Q.modelo) { Q.modelo = qm.value; renderCotizar(); } };
   $('#qIng').onchange = e => { Q.ingreso = e.target.value; renderSummary(); };
+  document.querySelectorAll('#s-cotizar .svc .info').forEach(b => b.onclick = e => { e.stopPropagation(); b.closest('.svc').classList.toggle('open'); });
+  document.querySelectorAll('#s-cotizar .svc .tip').forEach(t => t.onclick = e => { e.stopPropagation(); t.closest('.svc').classList.remove('open'); });
   document.querySelectorAll('#s-cotizar .svc').forEach(el => el.onclick = () => {
     const n = el.dataset.s; Q.sel = Q.sel.includes(n) ? Q.sel.filter(x => x !== n) : [...Q.sel, n];
     el.classList.toggle('on'); renderSummary();
@@ -662,20 +710,21 @@ function renderSummary() {
   box.classList.toggle('on', on); if (!on) return;
   const q = quote();
   const v = Q.mode === 'cliente' ? veh(Q.patente) : null; const c = v ? cli(v.idCliente) : null;
-  const msg = `Hola${c ? ' ' + c.nombre.split(' ')[0] : ''}! Para tu ${q.vName || 'vehículo'} el trabajo (${Q.sel.join(', ')}) lleva aprox. ${q.habiles} ${q.habiles === 1 ? 'día' : 'días'}. Si lo traés el ${fmtD(Q.ingreso)}, te lo entregamos el ${fmtD(q.entrega)}. Precio estimado: ${money(q.precio)}. — Valhalla`;
+  const msg = msgCotizacion(c ? c.nombre : '', q.vName, Q.sel, q.habiles, Q.ingreso, q.entrega, q.precio);
+  const puedeGuardar = Q.mode === 'cliente' && Q.patente;
   box.innerHTML = `
     <div class="nums"><div>Trabajo<b>${q.vName ? days(q.dias) : '—'}</b></div><div>Entrega<b>${q.vName ? fmtDL(q.entrega) : 'elegí vehículo'}</b></div><div>Precio<b style="color:var(--gold2)">${q.vName ? money(q.precio) : '—'}</b></div></div>
-    <div class="acts">
+    ${isAdmin() ? `<div class="acts">
       <a class="btn green sm" style="width:100%" href="${q.vName ? waLink(c ? c.telefono : '', msg) : '#'}" target="_blank" rel="noopener" ${q.vName ? '' : 'onclick="return false"'}>WhatsApp</a>
-      <button class="btn gold sm" style="width:100%" id="qSave" ${Q.mode === 'cliente' && Q.patente ? '' : 'disabled'}>Guardar presupuesto</button>
-    </div>
+      <button class="btn gold sm" style="width:100%" id="qSave" ${puedeGuardar ? '' : 'disabled'}>Guardar presupuesto</button>
+    </div>` : `<button class="btn gold sm" style="width:100%" id="qSave" ${puedeGuardar ? '' : 'disabled'}>Enviar al negocio para aprobar</button>`}
     ${Q.mode === 'rapida' ? '<p class="note" style="margin:8px 2px 0">Para guardar el presupuesto, registrá al cliente y su vehículo.</p>' : ''}
   `;
   const sb = $('#qSave');
   if (sb) sb.onclick = async e => {
-    const r = await run(e.currentTarget, () => api('addPresupuesto', { patente: Q.patente, servicios: Q.sel, estado: 'Pendiente' }));
+    const r = await run(e.currentTarget, () => api('addPresupuesto', { patente: Q.patente, servicios: Q.sel }));
     const n = r.n; Q.sel = []; render(); renderSummary();
-    toast('Presupuesto ' + n + ' guardado ✓');
+    toast(r.estado === ESPERA ? 'Presupuesto ' + n + ' enviado al negocio para aprobar ✓' : 'Presupuesto ' + n + ' guardado ✓');
     sheetPresu(n);
   };
 }
@@ -695,7 +744,7 @@ function renderAgenda() {
     cells += `<div class="day ${d.getMonth() !== m - 1 ? 'out' : ''} ${isWork(s) ? '' : 'off'} ${s === hoy ? 'today' : ''} ${s === A.sel ? 'sel' : ''} ${lvl}" data-d="${s}"><span>${d.getDate()}</span><span class="dots">${'<i></i>'.repeat(Math.min(n, 4))}</span></div>`;
   }
   const list = carsOn(A.sel);
-  const sinTurno = [...new Set(DB.presupuestos.filter(p => p.estado !== 'Rechazado' && p.estado !== 'Vencido').map(p => p.n))].filter(n => !DB.turnos.some(t => t.n === n && t.estado !== 'Cancelado'));
+  const sinTurno = [...new Set(DB.presupuestos.filter(p => p.estado !== 'Rechazado' && p.estado !== 'Vencido' && p.estado !== ESPERA).map(p => p.n))].filter(n => !DB.turnos.some(t => t.n === n && t.estado !== 'Cancelado'));
   $('#s-agenda').innerHTML = `
     <h1>Agenda</h1><p class="sub">Ocupación del taller · capacidad ${cap} autos</p>
     <div class="calhead"><button class="iconbtn" id="aPrev"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
